@@ -5,14 +5,16 @@ import jwt from "jsonwebtoken";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 dotenv.config();
+
 const app = express();
+const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({ origin: "*" })); // সব origin allow
 app.use(express.json());
 
 // MongoDB URI
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -28,8 +30,7 @@ let usersCollection;
 // JWT Middleware
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader)
-    return res.status(401).send({ message: "Unauthorized access 🚫" });
+  if (!authHeader) return res.status(401).send({ message: "Unauthorized access 🚫" });
 
   const token = authHeader.split(" ")[1];
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
@@ -43,8 +44,8 @@ function verifyJWT(req, res, next) {
 async function verifyAdmin(req, res, next) {
   const email = req.decoded.email;
   const user = await usersCollection.findOne({ email });
-  if (user?.role !== "admin") {
-    return res.status(403).send({ message: "Admin access only " });
+  if (!user || user.role !== "admin") {
+    return res.status(403).send({ message: "Admin access only 🚫" });
   }
   next();
 }
@@ -55,7 +56,7 @@ async function run() {
     await client.connect();
     console.log("✅ MongoDB connected!");
 
-    const db = client.db("foodAll");
+    const db = client.db(process.env.DB_NAME);
     foodsCollection = db.collection("foods");
     ordersCollection = db.collection("orders");
     usersCollection = db.collection("users");
@@ -67,7 +68,15 @@ async function run() {
       res.send({ token });
     });
 
-    // Users
+    // Users routes
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const existing = await usersCollection.findOne({ email: user.email });
+      if (existing) return res.send({ message: "User already exists" });
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const user = await usersCollection.findOne({ email });
@@ -80,15 +89,7 @@ async function run() {
       res.send(users);
     });
 
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      const existing = await usersCollection.findOne({ email: user.email });
-      if (existing) return res.send({ message: "User already exists" });
-      const result = await usersCollection.insertOne(user);
-      res.send(result);
-    });
-
-    // Foods CRUD
+    // Foods routes
     app.get("/foods", async (req, res) => {
       const result = await foodsCollection.find().toArray();
       res.send(result);
@@ -97,6 +98,7 @@ async function run() {
     app.get("/foods/:id", async (req, res) => {
       const id = req.params.id;
       const result = await foodsCollection.findOne({ _id: new ObjectId(id) });
+      if (!result) return res.status(404).send({ message: "Food not found" });
       res.send(result);
     });
 
@@ -112,7 +114,7 @@ async function run() {
       res.send(result);
     });
 
-    // Orders
+    // Orders routes
     app.post("/orders", verifyJWT, async (req, res) => {
       const order = req.body;
       const result = await ordersCollection.insertOne(order);
@@ -122,7 +124,7 @@ async function run() {
     app.get("/orders", verifyJWT, async (req, res) => {
       const decoded = req.decoded;
       const email = req.query.email;
-      if (decoded.email !== email) return res.status(403).send({ message: "Forbidden " });
+      if (decoded.email !== email) return res.status(403).send({ message: "Forbidden 🚫" });
       const orders = await ordersCollection.find({ buyerEmail: email }).toArray();
       res.send(orders);
     });
@@ -134,12 +136,13 @@ async function run() {
       if (!order) return res.status(404).send({ message: "Order not found" });
       if (order.buyerEmail !== decodedEmail) {
         const user = await usersCollection.findOne({ email: decodedEmail });
-        if (user?.role !== "admin") return res.status(403).send({ message: "Forbidden " });
+        if (user?.role !== "admin") return res.status(403).send({ message: "Forbidden 🚫" });
       }
       const result = await ordersCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
+    console.log("✅ All routes are ready!");
   } catch (err) {
     console.error("❌ MongoDB error:", err);
   }
