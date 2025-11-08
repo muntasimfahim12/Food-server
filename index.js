@@ -6,13 +6,12 @@ import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 dotenv.config();
 const app = express();
-const port = process.env.PORT || 5000;
 
-//  Middleware
-app.use(cors());
+// Middleware
+app.use(cors({ origin: "*" })); // সব origin allow
 app.use(express.json());
 
-//  MongoDB URI
+// MongoDB URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
   serverApi: {
@@ -26,7 +25,7 @@ let foodsCollection;
 let ordersCollection;
 let usersCollection;
 
-//  JWT Middleware
+// JWT Middleware
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader)
@@ -40,7 +39,7 @@ function verifyJWT(req, res, next) {
   });
 }
 
-//  Admin Middleware
+// Admin Middleware
 async function verifyAdmin(req, res, next) {
   const email = req.decoded.email;
   const user = await usersCollection.findOne({ email });
@@ -50,7 +49,7 @@ async function verifyAdmin(req, res, next) {
   next();
 }
 
-// 🔹 Run async function
+// Connect MongoDB & setup routes
 async function run() {
   try {
     await client.connect();
@@ -68,7 +67,7 @@ async function run() {
       res.send({ token });
     });
 
-    // Get user by email
+    // Users
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const user = await usersCollection.findOne({ email });
@@ -76,13 +75,11 @@ async function run() {
       res.send(user);
     });
 
-    //  Get all users (admin only)
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const users = await usersCollection.find().toArray();
       res.send(users);
     });
 
-    // ➕ Add user (signup)
     app.post("/users", async (req, res) => {
       const user = req.body;
       const existing = await usersCollection.findOne({ email: user.email });
@@ -91,7 +88,7 @@ async function run() {
       res.send(result);
     });
 
-    //  Foods CRUD
+    // Foods CRUD
     app.get("/foods", async (req, res) => {
       const result = await foodsCollection.find().toArray();
       res.send(result);
@@ -115,7 +112,7 @@ async function run() {
       res.send(result);
     });
 
-    //  Orders
+    // Orders
     app.post("/orders", verifyJWT, async (req, res) => {
       const order = req.body;
       const result = await ordersCollection.insertOne(order);
@@ -143,8 +140,6 @@ async function run() {
       res.send(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
-    console.log("✅ MongoDB ping successful!");
   } catch (err) {
     console.error("❌ MongoDB error:", err);
   }
@@ -152,8 +147,10 @@ async function run() {
 
 run().catch(console.dir);
 
+// Root route
 app.get("/", (req, res) => {
   res.send("🍕 FlavorNest Server is Running!");
 });
 
-app.listen(port, () => console.log(`🚀 Server running at http://localhost:${port}`));
+// ✅ Export app for Vercel
+export default app;
