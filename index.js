@@ -9,7 +9,13 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 //  Middleware
-app.use(cors());
+const corsOptions = {
+  origin: "https://food-euyv.vercel.app", // <-- তোমার frontend URL
+  methods: ["GET", "POST", "PATCH", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 //  MongoDB URI
