@@ -8,35 +8,29 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-//  Middleware
+// Middleware
 const corsOptions = {
-  origin: "https://food-euyv.vercel.app", // <-- তোমার frontend URL
+  origin: ["http://localhost:5173", "https://food-euyv.vercel.app"], // Local + Prod
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
-
 app.use(cors(corsOptions));
 app.use(express.json());
 
-//  MongoDB URI
+// MongoDB URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  },
+  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
 });
 
 let foodsCollection;
 let ordersCollection;
 let usersCollection;
 
-//  JWT Middleware
+// JWT Middleware
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader)
-    return res.status(401).send({ message: "Unauthorized access 🚫" });
+  if (!authHeader) return res.status(401).send({ message: "Unauthorized access 🚫" });
 
   const token = authHeader.split(" ")[1];
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
@@ -46,17 +40,17 @@ function verifyJWT(req, res, next) {
   });
 }
 
-//  Admin Middleware
+// Admin Middleware
 async function verifyAdmin(req, res, next) {
   const email = req.decoded.email;
   const user = await usersCollection.findOne({ email });
   if (user?.role !== "admin") {
-    return res.status(403).send({ message: "Admin access only " });
+    return res.status(403).send({ message: "Admin access only 🚫" });
   }
   next();
 }
 
-// 🔹 Run async function
+// Run async function
 async function run() {
   try {
     await client.connect();
@@ -74,7 +68,7 @@ async function run() {
       res.send({ token });
     });
 
-    // Get user by email
+    // Users
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const user = await usersCollection.findOne({ email });
@@ -82,13 +76,11 @@ async function run() {
       res.send(user);
     });
 
-    //  Get all users (admin only)
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const users = await usersCollection.find().toArray();
       res.send(users);
     });
 
-    // ➕ Add user (signup)
     app.post("/users", async (req, res) => {
       const user = req.body;
       const existing = await usersCollection.findOne({ email: user.email });
@@ -97,7 +89,7 @@ async function run() {
       res.send(result);
     });
 
-    //  Foods CRUD
+    // Foods CRUD
     app.get("/foods", async (req, res) => {
       const result = await foodsCollection.find().toArray();
       res.send(result);
@@ -106,6 +98,7 @@ async function run() {
     app.get("/foods/:id", async (req, res) => {
       const id = req.params.id;
       const result = await foodsCollection.findOne({ _id: new ObjectId(id) });
+      if (!result) return res.status(404).send({ message: "Food not found" });
       res.send(result);
     });
 
@@ -121,7 +114,7 @@ async function run() {
       res.send(result);
     });
 
-    //  Orders
+    // Orders
     app.post("/orders", verifyJWT, async (req, res) => {
       const order = req.body;
       const result = await ordersCollection.insertOne(order);
@@ -131,7 +124,7 @@ async function run() {
     app.get("/orders", verifyJWT, async (req, res) => {
       const decoded = req.decoded;
       const email = req.query.email;
-      if (decoded.email !== email) return res.status(403).send({ message: "Forbidden " });
+      if (decoded.email !== email) return res.status(403).send({ message: "Forbidden 🚫" });
       const orders = await ordersCollection.find({ buyerEmail: email }).toArray();
       res.send(orders);
     });
@@ -143,7 +136,7 @@ async function run() {
       if (!order) return res.status(404).send({ message: "Order not found" });
       if (order.buyerEmail !== decodedEmail) {
         const user = await usersCollection.findOne({ email: decodedEmail });
-        if (user?.role !== "admin") return res.status(403).send({ message: "Forbidden " });
+        if (user?.role !== "admin") return res.status(403).send({ message: "Forbidden 🚫" });
       }
       const result = await ordersCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
