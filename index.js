@@ -40,6 +40,24 @@ function verifyJWT(req, res, next) {
   });
 }
 
+// POST /users => add new user (admin/super admin)
+app.post("/users", verifyJWT, verifyAdmin, async (req, res) => {
+  const { name, email, role } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).send({ message: "Name, email, and role are required" });
+  }
+
+  const existing = await usersCollection.findOne({ email });
+  if (existing) return res.status(400).send({ message: "User already exists" });
+
+  const result = await usersCollection.insertOne({ name, email, role });
+  res.send({ message: "User added successfully", result });
+});
+
+
+
+
 // Admin Middleware
 async function verifyAdmin(req, res, next) {
   const email = req.decoded.email;
