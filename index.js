@@ -10,7 +10,7 @@ const port = process.env.PORT || 5000;
 
 // Middleware
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://food-euyv.vercel.app"], // Local + Prod
+  origin: ["http://localhost:5173", "https://food-panda-rho-one.vercel.app"],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
@@ -40,29 +40,11 @@ function verifyJWT(req, res, next) {
   });
 }
 
-// POST /users => add new user (admin/super admin)
-app.post("/users", verifyJWT, verifyAdmin, async (req, res) => {
-  const { name, email, role } = req.body;
-
-  if (!name || !email || !role) {
-    return res.status(400).send({ message: "Name, email, and role are required" });
-  }
-
-  const existing = await usersCollection.findOne({ email });
-  if (existing) return res.status(400).send({ message: "User already exists" });
-
-  const result = await usersCollection.insertOne({ name, email, role });
-  res.send({ message: "User added successfully", result });
-});
-
-
-
-
 // Admin Middleware
 async function verifyAdmin(req, res, next) {
   const email = req.decoded.email;
   const user = await usersCollection.findOne({ email });
-  if (user?.role !== "admin") {
+  if (user?.role !== "admin" && user?.role !== "super admin") {
     return res.status(403).send({ message: "Admin access only 🚫" });
   }
   next();
@@ -86,7 +68,15 @@ async function run() {
       res.send({ token });
     });
 
-    // Users
+    // Users CRUD
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const existing = await usersCollection.findOne({ email: user.email });
+      if (existing) return res.send({ message: "User already exists" });
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const user = await usersCollection.findOne({ email });
@@ -99,40 +89,58 @@ async function run() {
       res.send(users);
     });
 
-    app.post("/users", async (req, res) => {
-      const user = req.body;
-      const existing = await usersCollection.findOne({ email: user.email });
-      if (existing) return res.send({ message: "User already exists" });
-      const result = await usersCollection.insertOne(user);
-      res.send(result);
-    });
-
-    // Foods CRUD
+    // Foods CRUD + Gallery
     app.get("/foods", async (req, res) => {
-      const result = await foodsCollection.find().toArray();
-      res.send(result);
+      try {
+        const { category } = req.query; // optional: filter by category
+        let query = {};
+        if (category) query.category = category.toLowerCase(); // e.g. 'drink' or 'food'
+        const foods = await foodsCollection.find(query).toArray();
+        res.send(foods);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to fetch foods" });
+      }
     });
 
     app.get("/foods/:id", async (req, res) => {
-      const id = req.params.id;
-      const result = await foodsCollection.findOne({ _id: new ObjectId(id) });
-      if (!result) return res.status(404).send({ message: "Food not found" });
-      res.send(result);
+      try {
+        const id = req.params.id;
+        const food = await foodsCollection.findOne({ _id: new ObjectId(id) });
+        if (!food) return res.status(404).send({ message: "Food not found" });
+        res.send(food);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to fetch food" });
+      }
     });
 
     app.post("/foods", verifyJWT, verifyAdmin, async (req, res) => {
-      const food = req.body;
-      const result = await foodsCollection.insertOne(food);
-      res.send(result);
+      try {
+        const food = req.body;
+        if (!food.name || !food.price || !food.image) {
+          return res.status(400).send({ message: "Name, Price, Image required" });
+        }
+        const result = await foodsCollection.insertOne(food);
+        res.send({ message: "Food added successfully", insertedId: result.insertedId });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to add food" });
+      }
     });
 
     app.delete("/foods/:id", verifyJWT, verifyAdmin, async (req, res) => {
-      const id = req.params.id;
-      const result = await foodsCollection.deleteOne({ _id: new ObjectId(id) });
-      res.send(result);
+      try {
+        const id = req.params.id;
+        const result = await foodsCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to delete food" });
+      }
     });
 
-    // Orders
+    // Orders CRUD
     app.post("/orders", verifyJWT, async (req, res) => {
       const order = req.body;
       const result = await ordersCollection.insertOne(order);
