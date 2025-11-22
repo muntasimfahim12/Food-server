@@ -9,13 +9,18 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
+app.use(express.json());
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://food-panda-rho-one.vercel.app"],
+  origin: [
+    "http://localhost:5173", // Local development
+    "https://food-panda-rho-one.vercel.app", 
+    "https://food-panda-j3t8zl6m8-fahims-projects-d20ace09.vercel.app", 
+  ],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
-app.use(express.json());
+
 
 // MongoDB URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.cq1rtqv.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
