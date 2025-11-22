@@ -18,7 +18,8 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // MongoDB URI
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.cq1rtqv.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
+
 const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
 });
@@ -56,7 +57,7 @@ async function run() {
     await client.connect();
     console.log("✅ MongoDB connected!");
 
-    const db = client.db("foodAll");
+    const db = client.db(process.env.DB_NAME);
     foodsCollection = db.collection("foods");
     ordersCollection = db.collection("orders");
     usersCollection = db.collection("users");
@@ -92,9 +93,9 @@ async function run() {
     // Foods CRUD + Gallery
     app.get("/foods", async (req, res) => {
       try {
-        const { category } = req.query; // optional: filter by category
+        const { category } = req.query;
         let query = {};
-        if (category) query.category = category.toLowerCase(); // e.g. 'drink' or 'food'
+        if (category) query.category = category.toLowerCase();
         const foods = await foodsCollection.find(query).toArray();
         res.send(foods);
       } catch (err) {
