@@ -11,18 +11,22 @@ const port = process.env.PORT || 5000;
 // Middleware
 // CORS should come BEFORE express.json()
 
+
+app.use(express.json());
+
 const corsOptions = {
   origin: [
     "http://localhost:5173",
-    "https://food-panda-rho-one.vercel.app",
     "https://food-panda-j3t8zl6m8-fahims-projects-d20ace09.vercel.app",
+    "https://food-panda-rho-one.vercel.app"
   ],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
-app.use(express.json());
+
+
 
 
 
