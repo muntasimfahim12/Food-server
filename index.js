@@ -9,29 +9,23 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-// CORS should come BEFORE express.json()
-
-
 app.use(express.json());
 
 const corsOptions = {
   origin: [
-    "http://localhost:5173",
-    "https://food-panda-rho-one.vercel.app",
-    
+    "https://food-panda-rho-one.vercel.app", 
+    "https://food-panda-j3t8zl6m8-fahims-projects-d20ace09.vercel.app"
   ],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
+
 app.use(cors(corsOptions));
 
 
-
-
-
 // MongoDB URI
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@${process.env.DB_CLUSTER}.cq1rtqv.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
   serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
@@ -64,13 +58,12 @@ async function verifyAdmin(req, res, next) {
   next();
 }
 
-// Run async function
 async function run() {
   try {
     await client.connect();
     console.log("✅ MongoDB connected!");
 
-    const db = client.db(process.env.DB_NAME);
+    const db = client.db("foodAll");
     foodsCollection = db.collection("foods");
     ordersCollection = db.collection("orders");
     usersCollection = db.collection("users");
@@ -103,7 +96,7 @@ async function run() {
       res.send(users);
     });
 
-    // Foods CRUD + Gallery
+    // Foods CRUD
     app.get("/foods", async (req, res) => {
       try {
         const { category } = req.query;
@@ -164,6 +157,7 @@ async function run() {
     app.get("/orders", verifyJWT, async (req, res) => {
       const decoded = req.decoded;
       const email = req.query.email;
+      if (!email) return res.status(400).send({ message: "Email query is required" });
       if (decoded.email !== email) return res.status(403).send({ message: "Forbidden 🚫" });
       const orders = await ordersCollection.find({ buyerEmail: email }).toArray();
       res.send(orders);
