@@ -16,17 +16,16 @@ app.use(express.json());
 
 const corsOptions = {
   origin: [
-    "http://localhost:5173",
-    "https://food-panda-rho-one.vercel.app",
-    "https://food-panda-j3t8zl6m8-fahims-projects-d20ace09.vercel.app",
-    "https://food-panda-65fh14dzp-fahims-projects-d20ace09.vercel.app",
-    "https://food-panda-jwqfgqkcr-fahims-projects-d20ace09.vercel.app" // ✅ add this
+    "http://localhost:5173", // local dev
+    "https://food-panda-rho-one.vercel.app", // Vercel client ১
+    "https://food-panda-j3t8zl6m8-fahims-projects-d20ace09.vercel.app" // Vercel client ২
   ],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(cors(corsOptions));
+
 
 
 
