@@ -5,24 +5,18 @@ import jwt from "jsonwebtoken";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 dotenv.config();
+
 const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(express.json());
-
 const corsOptions = {
-  origin: [
-    "https://food-panda-rho-one.vercel.app", 
-    "https://food-panda-j3t8zl6m8-fahims-projects-d20ace09.vercel.app"
-  ],
+  origin: ["http://localhost:5173", "https://food-panda-rho-one.vercel.app"],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
-
-
 app.use(cors(corsOptions));
-
+app.use(express.json());
 
 // MongoDB URI
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
@@ -58,6 +52,7 @@ async function verifyAdmin(req, res, next) {
   next();
 }
 
+// Run async function
 async function run() {
   try {
     await client.connect();
@@ -96,7 +91,7 @@ async function run() {
       res.send(users);
     });
 
-    // Foods CRUD
+    // Foods CRUD + Gallery
     app.get("/foods", async (req, res) => {
       try {
         const { category } = req.query;
@@ -126,7 +121,7 @@ async function run() {
       try {
         const food = req.body;
         if (!food.name || !food.price || !food.image) {
-          return res.status(400).send({ message: "Name, Price, Image required" });
+          return res.status(400).send({ message: "Name, Price, and Image are required" });
         }
         const result = await foodsCollection.insertOne(food);
         res.send({ message: "Food added successfully", insertedId: result.insertedId });
@@ -157,7 +152,6 @@ async function run() {
     app.get("/orders", verifyJWT, async (req, res) => {
       const decoded = req.decoded;
       const email = req.query.email;
-      if (!email) return res.status(400).send({ message: "Email query is required" });
       if (decoded.email !== email) return res.status(403).send({ message: "Forbidden 🚫" });
       const orders = await ordersCollection.find({ buyerEmail: email }).toArray();
       res.send(orders);
@@ -185,6 +179,7 @@ async function run() {
 
 run().catch(console.dir);
 
+// Root
 app.get("/", (req, res) => {
   res.send("🍕 FlavorNest Server is Running!");
 });
