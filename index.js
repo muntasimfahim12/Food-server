@@ -5,8 +5,8 @@ import jwt from "jsonwebtoken";
 import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 
 dotenv.config();
-
 const app = express();
+const port = process.env.PORT || 5000;
 
 // Middleware
 const corsOptions = {
@@ -17,7 +17,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// MongoDB URI
+// MongoDB URI (fixed by adding backticks)
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
@@ -93,9 +93,9 @@ async function run() {
     // Foods CRUD + Gallery
     app.get("/foods", async (req, res) => {
       try {
-        const { category } = req.query;
+        const { category } = req.query; // optional: filter by category
         let query = {};
-        if (category) query.category = category.toLowerCase();
+        if (category) query.category = category.toLowerCase(); // e.g. 'drink' or 'food'
         const foods = await foodsCollection.find(query).toArray();
         res.send(foods);
       } catch (err) {
@@ -120,7 +120,7 @@ async function run() {
       try {
         const food = req.body;
         if (!food.name || !food.price || !food.image) {
-          return res.status(400).send({ message: "Name, Price, and Image are required" });
+          return res.status(400).send({ message: "Name, Price, Image required" });
         }
         const result = await foodsCollection.insertOne(food);
         res.send({ message: "Food added successfully", insertedId: result.insertedId });
@@ -178,10 +178,8 @@ async function run() {
 
 run().catch(console.dir);
 
-// Root
 app.get("/", (req, res) => {
   res.send("🍕 FlavorNest Server is Running!");
 });
 
-// ✅ Vercel-ready: app.listen() remove করা হয়েছে
-export default app;
+app.listen(port, () => console.log(`🚀 Server running at http://localhost:${port}`));
