@@ -7,21 +7,14 @@ import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5000;
 
 // Middleware
 const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "https://food-panda-rho-one.vercel.app",
-    "https://food-panda-lv9dep9ui-fahims-projects-d20ace09.vercel.app"
-  ],
+  origin: ["http://localhost:5173", "https://food-panda-rho-one.vercel.app"],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
-
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
 // MongoDB URI
@@ -190,4 +183,5 @@ app.get("/", (req, res) => {
   res.send("🍕 FlavorNest Server is Running!");
 });
 
-app.listen(port, () => console.log(`🚀 Server running at http://localhost:${port}`));
+// ✅ Vercel-ready: app.listen() remove করা হয়েছে
+export default app;
