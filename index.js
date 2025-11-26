@@ -8,224 +8,178 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5000;
 
-// CORS
+// Middleware
 const corsOptions = {
-  origin: [
-    "http://localhost:5173",
-    "https://food-panda-rho-one.vercel.app"
-  ],
+  origin: ["http://localhost:5173", "https://food-panda-rho-one.vercel.app"],
   methods: ["GET", "POST", "PATCH", "DELETE"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// MongoDB
+// MongoDB URI (fixed by adding backticks)
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.cq1rtqv.mongodb.net/?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: false,
-    deprecationErrors: true,
-  },
+  serverApi: { version: ServerApiVersion.v1, strict: true, deprecationErrors: true },
 });
 
 let foodsCollection;
 let ordersCollection;
 let usersCollection;
 
-// 🔐 Verify JWT
+// JWT Middleware
 function verifyJWT(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader)
-    return res.status(401).send({ message: "Unauthorized 🚫" });
+  if (!authHeader) return res.status(401).send({ message: "Unauthorized access 🚫" });
 
   const token = authHeader.split(" ")[1];
-
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-    if (err) return res.status(403).send({ message: "Forbidden 🚷" });
+    if (err) return res.status(403).send({ message: "Forbidden access 🚷" });
     req.decoded = decoded;
     next();
   });
 }
 
-// 🔐 Verify Admin
+// Admin Middleware
 async function verifyAdmin(req, res, next) {
   const email = req.decoded.email;
   const user = await usersCollection.findOne({ email });
-
   if (user?.role !== "admin" && user?.role !== "super admin") {
-    return res.status(403).send({ message: "Admin only 🚫" });
+    return res.status(403).send({ message: "Admin access only 🚫" });
   }
   next();
 }
 
+// Run async function
 async function run() {
   try {
     await client.connect();
-    console.log("✅ Connected to MongoDB");
+    console.log("✅ MongoDB connected!");
 
     const db = client.db("foodAll");
     foodsCollection = db.collection("foods");
     ordersCollection = db.collection("orders");
     usersCollection = db.collection("users");
 
-    // JWT Authentication
+    // JWT Token
     app.post("/jwt", (req, res) => {
       const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1h",
-      });
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "1h" });
       res.send({ token });
     });
 
-    // USERS ---------------------------------------
-
-    // Register user
+    // Users CRUD
     app.post("/users", async (req, res) => {
       const user = req.body;
-      const exists = await usersCollection.findOne({ email: user.email });
-      if (exists) return res.send({ message: "User already exists" });
-
+      const existing = await usersCollection.findOne({ email: user.email });
+      if (existing) return res.send({ message: "User already exists" });
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
 
-    // Get a single user
     app.get("/users/:email", async (req, res) => {
-      const user = await usersCollection.findOne({ email: req.params.email });
+      const email = req.params.email;
+      const user = await usersCollection.findOne({ email });
       if (!user) return res.status(404).send({ message: "User not found" });
       res.send(user);
     });
 
-    // Admin: Get all users
     app.get("/users", verifyJWT, verifyAdmin, async (req, res) => {
       const users = await usersCollection.find().toArray();
       res.send(users);
     });
 
-    // FOODS ---------------------------------------
-
-    // Get all foods
+    // Foods CRUD + Gallery
     app.get("/foods", async (req, res) => {
       try {
-        const { category } = req.query;
-
+        const { category } = req.query; // optional: filter by category
         let query = {};
-        if (category && category !== "all") {
-          query.category = category.toLowerCase();
-        }
-
+        if (category) query.category = category.toLowerCase(); // e.g. 'drink' or 'food'
         const foods = await foodsCollection.find(query).toArray();
         res.send(foods);
-      } catch {
-        res.status(500).send({ message: "Error fetching foods" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to fetch foods" });
       }
     });
 
-    // Get single food
     app.get("/foods/:id", async (req, res) => {
       try {
-        const food = await foodsCollection.findOne({
-          _id: new ObjectId(req.params.id),
-        });
-
+        const id = req.params.id;
+        const food = await foodsCollection.findOne({ _id: new ObjectId(id) });
         if (!food) return res.status(404).send({ message: "Food not found" });
         res.send(food);
-      } catch {
+      } catch (err) {
+        console.error(err);
         res.status(500).send({ message: "Failed to fetch food" });
       }
     });
 
-    // Add food (Admin only)
     app.post("/foods", verifyJWT, verifyAdmin, async (req, res) => {
       try {
         const food = req.body;
-
         if (!food.name || !food.price || !food.image) {
-          return res.status(400).send({ message: "Missing fields" });
+          return res.status(400).send({ message: "Name, Price, Image required" });
         }
-
-        // Normalize category
-        food.category = food.category.toLowerCase();
-
         const result = await foodsCollection.insertOne(food);
-        res.send({ insertedId: result.insertedId });
-      } catch {
+        res.send({ message: "Food added successfully", insertedId: result.insertedId });
+      } catch (err) {
+        console.error(err);
         res.status(500).send({ message: "Failed to add food" });
       }
     });
 
-    // Delete food
     app.delete("/foods/:id", verifyJWT, verifyAdmin, async (req, res) => {
-      const result = await foodsCollection.deleteOne({
-        _id: new ObjectId(req.params.id),
-      });
-      res.send(result);
+      try {
+        const id = req.params.id;
+        const result = await foodsCollection.deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Failed to delete food" });
+      }
     });
 
-    // ORDERS --------------------------------------
-
+    // Orders CRUD
     app.post("/orders", verifyJWT, async (req, res) => {
       const order = req.body;
-      order.createdAt = new Date();
-
       const result = await ordersCollection.insertOne(order);
       res.send(result);
     });
 
     app.get("/orders", verifyJWT, async (req, res) => {
+      const decoded = req.decoded;
       const email = req.query.email;
-
-      // Only owner or admin can view orders
-      if (email !== req.decoded.email) {
-        const user = await usersCollection.findOne({ email: req.decoded.email });
-        if (user?.role !== "admin")
-          return res.status(403).send({ message: "Forbidden" });
-      }
-
-      const orders = await ordersCollection
-        .find({ buyerEmail: email })
-        .toArray();
-
+      if (decoded.email !== email) return res.status(403).send({ message: "Forbidden 🚫" });
+      const orders = await ordersCollection.find({ buyerEmail: email }).toArray();
       res.send(orders);
     });
 
     app.delete("/orders/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
+      const decodedEmail = req.decoded.email;
       const order = await ordersCollection.findOne({ _id: new ObjectId(id) });
-
       if (!order) return res.status(404).send({ message: "Order not found" });
-
-      const requester = req.decoded.email;
-
-      if (order.buyerEmail !== requester) {
-        const user = await usersCollection.findOne({ email: requester });
-        if (user?.role !== "admin")
-          return res.status(403).send({ message: "Forbidden" });
+      if (order.buyerEmail !== decodedEmail) {
+        const user = await usersCollection.findOne({ email: decodedEmail });
+        if (user?.role !== "admin") return res.status(403).send({ message: "Forbidden 🚫" });
       }
-
       const result = await ordersCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
 
-    // Health check
     await client.db("admin").command({ ping: 1 });
-    console.log("🔥 Server Ready!");
-
+    console.log("✅ MongoDB ping successful!");
   } catch (err) {
-    console.error(err);
+    console.error("❌ MongoDB error:", err);
   }
 }
 
-run();
+run().catch(console.dir);
 
-// Root
 app.get("/", (req, res) => {
   res.send("🍕 FlavorNest Server is Running!");
 });
 
-app.listen(port, () =>
-  console.log(`🚀 Server running at http://localhost:${port}`)
-);
+app.listen(port, () => console.log(`🚀 Server running at http://localhost:${port}`));
